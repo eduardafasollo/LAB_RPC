@@ -5,21 +5,17 @@ import hashlib
 import time
 import random
 
-# IMPORTANTE: Usar os nomes de stubs gerados pelo seu mine_grpc.proto
 import mine_grpc_pb2 as pb2
 import mine_grpc_pb2_grpc as pb2_grpc
 
-# =================================================================
 # 1. ESTADO GLOBAL DO CLIENTE
-# =================================================================
+# ----------------------------------------------------------------
 solution_found = threading.Event() 
 found_solution_string = None
-CLIENT_ID = None # Será definido em run() a partir do argumento de linha de comando
+CLIENT_ID = None # definido em run() a partir do argumento de linha de comando
 
-
-# =================================================================
-# 2. LÓGICA DE MINERAÇÃO E HASHING
-# =================================================================
+#  MINERAÇÃO E HASHING
+# ----------------------------------------------------------------
 
 def is_valid_solution(solution_str, challenge_value):
     """Verifica se o hash SHA-1 da string atende ao desafio."""
@@ -36,22 +32,21 @@ def mine_worker(stub, transaction_id, challenge, worker_id, start_value, num_att
         if solution_found.is_set():
             break 
         
-        # Gera a string a ser testada, incorporando o CLIENT_ID e o ID do worker
+        # gera a string a ser testada, incorporando o CLIENT_ID e o ID do worker
         test_string = f"Client-{CLIENT_ID}-{i}-{worker_id}" 
         
         if is_valid_solution(test_string, challenge):
-            # NÃO imprima a solução aqui, pois a impressão pode ser atrasada e poluir o output
-            # A impressão será feita na função run_mine_process
+        
             found_solution_string = test_string
             solution_found.set()
             break
 
-# =================================================================
-# 3. ORQUESTRAÇÃO DA MINERAÇÃO (Opção 6)
-# =================================================================
+# 
+#  MINERAÇÃO
+# ----------------------------------------------------------------
 
 def run_mine_process(stub):
-    """Orquestra os passos de mineração (RPC + Local)."""
+    # orquestra os passos de mineração (RPC + Local)
     global solution_found, found_solution_string
     
     solution_found.clear()
@@ -60,12 +55,12 @@ def run_mine_process(stub):
     print("\n--- INICIANDO MINERAÇÃO ---")
     
     try:
-        # 1. Buscar transactionID atual
+        # buscar transactionID atual
         tx_id_response = stub.getTransactionId(pb2.void())
         transaction_id = tx_id_response.result
         print(f"1. TransactionID atual: {transaction_id}")
 
-        # 2. Buscar a challenge (desafio) associada
+        # buscar a challenge (desafio) associada
         challenge_response = stub.getChallenge(pb2.transactionId(transactionId=transaction_id))
         challenge = challenge_response.result
         print(f"2. Desafio (zeros à esquerda): {challenge}")
@@ -74,7 +69,7 @@ def run_mine_process(stub):
             print("Erro: Desafio inválido recebido do servidor.")
             return
 
-        # 3. Buscar, localmente, uma solução (Multithread)
+        # busca localmente uma solução -m ultithread
         NUM_THREADS = 8
         ATTEMPTS_PER_THREAD = 20000000 
         
@@ -87,14 +82,14 @@ def run_mine_process(stub):
 
         print(f"3. Mineração multithread em andamento ({NUM_THREADS} threads)...")
 
-        # Aguarda até que a solução seja encontrada
         while not solution_found.is_set():
+             # aguarda até que a solução seja encontrada
             time.sleep(0.5)
             
         for thread in threads:
             thread.join(timeout=0.1) 
 
-        # 4. Imprimir localmente a solução encontrada
+        # imprime localmente a solução encontrada
         solution_str = found_solution_string
         print(f"\n4. Solução encontrada (Local): {solution_str}")
         
@@ -102,7 +97,7 @@ def run_mine_process(stub):
              print("Aviso: Solução não encontrada.")
              return
              
-        # 5. Submeter a solução ao servidor e aguardar resultado
+        # busca solucao e a aguarda
         submit_args = pb2.challengeArgs(
             transactionId=transaction_id,
             clientId=CLIENT_ID,
@@ -111,7 +106,7 @@ def run_mine_process(stub):
         submit_result_pb = stub.submitChallenge(submit_args)
         submit_result = submit_result_pb.result
 
-        # 6. Imprimir/Decodificar resposta do servidor
+        # imprimir ou decodificar resposta do servidor
         if submit_result == 1:
             print(f"\nSUCESSO! A solução foi aceita. Você (ID {CLIENT_ID}) ganhou a recompensa e um novo desafio foi gerado!")
         elif submit_result == 0:
@@ -127,9 +122,8 @@ def run_mine_process(stub):
         print(f"Erro de comunicação gRPC: {e.details()}")
 
 
-# =================================================================
-# 4. FUNÇÕES DE ENTRADA E MENU INTERATIVO (Final)
-# =================================================================
+# FUNÇÕES DE ENTRADA E MENU INTERATIVO
+# ----------------------------------------------------------------
 
 def get_transaction_id_input(stub, prompt="Digite o ID da transação (0 para atual):"):
     while True:
@@ -149,7 +143,7 @@ def get_transaction_id_input(stub, prompt="Digite o ID da transação (0 para at
 def run():
     global CLIENT_ID
     
-    # Requer 3 argumentos: [script] [server_address:port] [client_id]
+    # PRECISA DOS 3 ARGUMENTOS: [script] [server_address:port] [client_id]
     if len(sys.argv) < 3:
         print("Uso: python grpcCalc_client.py <server_address:port> <client_id>")
         sys.exit(1)
@@ -157,7 +151,7 @@ def run():
     server_address = sys.argv[1]
     
     try:
-        # Define o ID do cliente a partir do argumento de linha de comando
+        #define id do cliente
         CLIENT_ID = int(sys.argv[2]) 
     except ValueError:
         print("Erro: O ID do cliente deve ser um número inteiro.")
@@ -184,7 +178,7 @@ def run():
             choice = input("Escolha uma opção: ")
             
             if choice == '1':
-                # getTransactionID() (Sem parâmetros)
+                # getTransactionID()
                 res = stub.getTransactionId(pb2.void())
                 print(f"ID da Transação Atual Pendente: {res.result}")
             
@@ -203,7 +197,7 @@ def run():
                 tx_id = get_transaction_id_input(stub, "ID da transação para consultar o Status:")
                 if tx_id is not None:
                     res = stub.getTransactionStatus(pb2.transactionId(transactionId=tx_id))
-                    # Regra: 0=Resolvido, 1=Pendente, -1=Inválido
+                    # regra: 0=resolvido, 1= pendente, -1= inválido
                     status_map = {1: "Pendente", 0: "Resolvido", -1: "ID Inválido"}
                     print(f"Status da Transação ID {tx_id}: {status_map.get(res.result, 'Desconhecido')}")
             
@@ -214,7 +208,7 @@ def run():
                     res = stub.getWinner(pb2.transactionId(transactionId=tx_id))
                     winner_id = res.result
                     
-                    # Regra: >0 = clientID, 0 = sem vencedor/pendente, -1 = inválido
+                    # regra: >0 = clientID, 0 = sem vencedor/pendente, -1 = inválido
                     if winner_id == -1:
                         print(f"Vencedor da Transação ID {tx_id}: ID INVÁLIDO.")
                     elif winner_id == 0:
@@ -253,9 +247,7 @@ def run():
 
     print("Cliente encerrado.")
 
-
-# =================================================================
-# 5. BLOCL DE EXECUÇÃO
-# =================================================================
+# BLOCO DE EXECUÇÃO
+# ----------------------------------------------------------------
 if __name__ == '__main__':
     run()

@@ -36,7 +36,7 @@ def generate_new_challenge(old_id):
     new_challenge = old_challenge + 1
     
     #define a dificuldade maxima do challenge = 20
-    MAX_CHALLENGE = 20
+    MAX_CHALLENGE = 6
     if new_challenge > MAX_CHALLENGE:
         new_challenge = MAX_CHALLENGE 
         #nao deixa passar da dificuldade maxima
